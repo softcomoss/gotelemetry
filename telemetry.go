@@ -1,6 +1,7 @@
 package gotelemetry
 
 import (
+	"context"
 	"errors"
 	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpclogrus "github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
@@ -168,6 +169,9 @@ func NewServerTelemetry(serviceName, environment string, opt ...Option) *Softcom
 			grpcopentracing.StreamServerInterceptor(),
 			grpclogrus.StreamServerInterceptor(entry),
 			grpcrecovery.StreamServerInterceptor(),
+			grpclogrus.PayloadStreamServerInterceptor(entry, func(ctx context.Context, fullMethodName string, servingObject interface{}) bool {
+				return true
+			}),
 			apmgrpc.NewStreamServerInterceptor(apmgrpc.WithRecovery()),
 
 		)),
@@ -175,6 +179,9 @@ func NewServerTelemetry(serviceName, environment string, opt ...Option) *Softcom
 			grpcctxtags.UnaryServerInterceptor(),
 			grpcopentracing.UnaryServerInterceptor(),
 			grpclogrus.UnaryServerInterceptor(entry),
+			grpclogrus.PayloadUnaryServerInterceptor(entry, func(ctx context.Context, fullMethodName string, servingObject interface{}) bool {
+				return true
+			}),
 			apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery()),
 			grpcrecovery.UnaryServerInterceptor(),
 		)))
