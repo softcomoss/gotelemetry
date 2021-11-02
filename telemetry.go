@@ -136,7 +136,7 @@ func (s SoftcomTelemetry) UseInterceptedGRPCClient(target string, opts ...grpc.D
 func (s SoftcomTelemetry) Publish(topic string, data []byte) error {
 	fields := logrus.Fields{
 		"topic":   topic,
-		"data":    data,
+		"data":    string(data),
 		"service": s.serviceName,
 	}
 	if s.EventStore == nil {
