@@ -11,7 +11,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/softcomoss/jetstreamclient"
 	"go.elastic.co/apm/module/apmgrpc"
+	"go.elastic.co/apm/module/apmmongo"
 	"go.elastic.co/ecslogrus"
+	"go.mongodb.org/mongo-driver/event"
 	"google.golang.org/grpc"
 	"log"
 	"os"
@@ -99,7 +101,8 @@ func mergeServerOptions(options ...Option) *Options {
 }
 
 type SoftcomTelemetry struct {
-	grpcServer *grpc.Server
+	serviceName string
+	grpcServer  *grpc.Server
 	//httpServer *http.Server
 	*logrus.Logger
 	jetstreamclient.EventStore
@@ -111,6 +114,10 @@ func (s SoftcomTelemetry) UseInterceptedGRPCServer() *grpc.Server {
 
 func (s SoftcomTelemetry) UseInterceptedLogger() *logrus.Logger {
 	return s.Logger
+}
+
+func (s SoftcomTelemetry) UseMongoMonitor() *event.CommandMonitor {
+	return apmmongo.CommandMonitor()
 }
 
 func (s SoftcomTelemetry) UseInterceptedGRPCClient(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
@@ -130,7 +137,7 @@ func (s SoftcomTelemetry) Publish(topic string, data []byte) error {
 	s.WithFields(logrus.Fields{
 		"topic":   topic,
 		"data":    data,
-		"service": s.GetServiceName(),
+		"service": s.serviceName,
 	}).Infof("published event to %s topic", topic)
 
 	return s.EventStore.Publish(topic, data)
@@ -169,28 +176,29 @@ func NewServerTelemetry(serviceName, environment string, opt ...Option) *Softcom
 			grpcopentracing.StreamServerInterceptor(),
 			grpclogrus.StreamServerInterceptor(entry),
 			grpcrecovery.StreamServerInterceptor(),
+			apmgrpc.NewStreamServerInterceptor(apmgrpc.WithRecovery()),
 			grpclogrus.PayloadStreamServerInterceptor(entry, func(ctx context.Context, fullMethodName string, servingObject interface{}) bool {
 				return true
 			}),
-			apmgrpc.NewStreamServerInterceptor(apmgrpc.WithRecovery()),
 
 		)),
 		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
 			grpcctxtags.UnaryServerInterceptor(),
 			grpcopentracing.UnaryServerInterceptor(),
 			grpclogrus.UnaryServerInterceptor(entry),
+			grpcrecovery.UnaryServerInterceptor(),
+			apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery()),
 			grpclogrus.PayloadUnaryServerInterceptor(entry, func(ctx context.Context, fullMethodName string, servingObject interface{}) bool {
 				return true
 			}),
-			apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery()),
-			grpcrecovery.UnaryServerInterceptor(),
 		)))
 
 	grpcServer := grpc.NewServer(serverOptions.grpcServerOptions...)
 
 	return &SoftcomTelemetry{
-		grpcServer: grpcServer,
-		Logger:     logger,
-		EventStore: serverOptions.eventStore,
+		serviceName: serviceName,
+		grpcServer:  grpcServer,
+		Logger:      logger,
+		EventStore:  serverOptions.eventStore,
 	}
 }
