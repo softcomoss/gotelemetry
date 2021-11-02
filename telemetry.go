@@ -134,13 +134,23 @@ func (s SoftcomTelemetry) UseInterceptedGRPCClient(target string, opts ...grpc.D
 }
 
 func (s SoftcomTelemetry) Publish(topic string, data []byte) error {
-	s.WithFields(logrus.Fields{
+	fields := logrus.Fields{
 		"topic":   topic,
 		"data":    data,
 		"service": s.serviceName,
-	}).Infof("published event to %s topic", topic)
+	}
+	if s.EventStore == nil {
+		s.WithFields(fields).Error("cannot publish events because event store not provided in telemetry chain.")
+		return nil
+	}
 
-	return s.EventStore.Publish(topic, data)
+	if err := s.EventStore.Publish(topic, data); err != nil {
+		s.WithError(err).WithFields(fields).Error("failed to publish event to topic %s", topic)
+		return err
+	}
+
+	s.WithFields(fields).Infof("published event to %s topic", topic)
+	return nil
 }
 
 func NewServerTelemetry(serviceName, environment string, opt ...Option) *SoftcomTelemetry {
