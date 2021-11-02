@@ -1,4 +1,4 @@
-module github.com/softcomoss/gotelemtry
+module github.com/softcomoss/gotelemetry
 
 go 1.16
 
