@@ -1,6 +1,6 @@
 package main
 
-import gotelemetry "github.com/softcomoss/gotelemtry"
+import "github.com/softcomoss/gotelemetry"
 
 func main() {
 	tlm := gotelemetry.NewServerTelemetry("example-service", "production")
