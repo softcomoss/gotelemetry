@@ -204,6 +204,19 @@ func NewServerTelemetry(serviceName, environment string, opt ...Option) *Softcom
 			grpcrecovery.StreamServerInterceptor(),
 			apmgrpc.NewStreamServerInterceptor(apmgrpc.WithRecovery()),
 			grpclogrus.PayloadStreamServerInterceptor(entry, func(ctx context.Context, fullMethodName string, servingObject interface{}) bool {
+				labels := logrus.Fields{}
+				tx := apm.TransactionFromContext(ctx)
+				if tx != nil {
+					traceContext := tx.TraceContext()
+					labels["trace.id"] = traceContext.Trace.String()
+					labels["transaction.id"] = traceContext.Span.String()
+					if span := apm.SpanFromContext(ctx); span != nil {
+						labels["span.id"] = span.TraceContext().Span.String()
+					}
+				}
+
+				e := entry.WithFields(labels)
+				entry = e
 				return true
 			}),
 
@@ -215,6 +228,19 @@ func NewServerTelemetry(serviceName, environment string, opt ...Option) *Softcom
 			grpcrecovery.UnaryServerInterceptor(),
 			apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery()),
 			grpclogrus.PayloadUnaryServerInterceptor(entry, func(ctx context.Context, fullMethodName string, servingObject interface{}) bool {
+				labels := logrus.Fields{}
+				tx := apm.TransactionFromContext(ctx)
+				if tx != nil {
+					traceContext := tx.TraceContext()
+					labels["trace.id"] = traceContext.Trace.String()
+					labels["transaction.id"] = traceContext.Span.String()
+					if span := apm.SpanFromContext(ctx); span != nil {
+						labels["span.id"] = span.TraceContext().Span.String()
+					}
+				}
+
+				e := entry.WithFields(labels)
+				entry = e
 				return true
 			}),
 		)))
