@@ -10,6 +10,7 @@ import (
 	grpcopentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"github.com/sirupsen/logrus"
 	"github.com/softcomoss/jetstreamclient"
+	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
 	"go.elastic.co/apm/module/apmmongo"
 	"go.elastic.co/ecslogrus"
@@ -131,6 +132,21 @@ func (s SoftcomTelemetry) UseInterceptedGRPCClient(target string, opts ...grpc.D
 		grpc.WithStreamInterceptor(apmgrpc.NewStreamClientInterceptor()))
 
 	return grpc.Dial(target, opts...)
+}
+
+func (s SoftcomTelemetry) WithContext(ctx context.Context) *logrus.Entry {
+	labels := make(map[string]string)
+	tx := apm.TransactionFromContext(ctx)
+	if tx != nil {
+		traceContext := tx.TraceContext()
+		labels["trace.id"] = traceContext.Trace.String()
+		labels["transaction.id"] = traceContext.Span.String()
+		if span := apm.SpanFromContext(ctx); span != nil {
+			labels["span.id"] = span.TraceContext().Span.String()
+		}
+	}
+
+	return s.Logger.WithContext(ctx)
 }
 
 func (s SoftcomTelemetry) Publish(topic string, data []byte) error {
