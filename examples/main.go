@@ -9,5 +9,5 @@ func main() {
 
 	server := tlm.UseInterceptedGRPCServer()
 
-	server.S
+	server.Serve(nil)
 }

@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	grpclogrus "github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	grpcrecovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	grpcctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
-	grpcopentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"github.com/sirupsen/logrus"
+	grpclogrus "github.com/softcomoss/gotelemetry/libs/logrus"
 	"github.com/softcomoss/jetstreamclient"
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
@@ -199,48 +198,20 @@ func NewServerTelemetry(serviceName, environment string, opt ...Option) *Softcom
 	serverOptions.grpcServerOptions = append(serverOptions.grpcServerOptions,
 		grpc.StreamInterceptor(grpcmiddleware.ChainStreamServer(
 			grpcctxtags.StreamServerInterceptor(),
-			grpcopentracing.StreamServerInterceptor(),
 			grpclogrus.StreamServerInterceptor(entry),
 			grpcrecovery.StreamServerInterceptor(),
 			apmgrpc.NewStreamServerInterceptor(apmgrpc.WithRecovery()),
 			grpclogrus.PayloadStreamServerInterceptor(entry, func(ctx context.Context, fullMethodName string, servingObject interface{}) bool {
-				labels := logrus.Fields{}
-				tx := apm.TransactionFromContext(ctx)
-				if tx != nil {
-					traceContext := tx.TraceContext()
-					labels["trace.id"] = traceContext.Trace.String()
-					labels["transaction.id"] = traceContext.Span.String()
-					if span := apm.SpanFromContext(ctx); span != nil {
-						labels["span.id"] = span.TraceContext().Span.String()
-					}
-				}
-
-				e := entry.WithFields(labels)
-				entry = e
 				return true
 			}),
 
 		)),
 		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
 			grpcctxtags.UnaryServerInterceptor(),
-			grpcopentracing.UnaryServerInterceptor(),
 			grpclogrus.UnaryServerInterceptor(entry),
 			grpcrecovery.UnaryServerInterceptor(),
 			apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery()),
 			grpclogrus.PayloadUnaryServerInterceptor(entry, func(ctx context.Context, fullMethodName string, servingObject interface{}) bool {
-				labels := logrus.Fields{}
-				tx := apm.TransactionFromContext(ctx)
-				if tx != nil {
-					traceContext := tx.TraceContext()
-					labels["trace.id"] = traceContext.Trace.String()
-					labels["transaction.id"] = traceContext.Span.String()
-					if span := apm.SpanFromContext(ctx); span != nil {
-						labels["span.id"] = span.TraceContext().Span.String()
-					}
-				}
-
-				e := entry.WithFields(labels)
-				entry = e
 				return true
 			}),
 		)))
